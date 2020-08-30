@@ -11,7 +11,7 @@ cargo install --git https://github.com/shino16/cargo-auto-bundle
 ## 使い方
 
 ```
-cargo-auto-bundle [--crate <crate [default: .]>] [--entry-point <entry-point [default: src/main.rs]>]
+cargo auto-bundle [--crate <crate [default: .]>] [--entry-point <entry-point [default: src/main.rs]>]
 ```
 
 * `<crate>/Cargo.toml`をパースし、クレート名を取得します。
