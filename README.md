@@ -14,9 +14,10 @@ cargo install --git https://github.com/shino16/cargo-auto-bundle
 cargo auto-bundle [--crate <crate [default: .]>] [--entry-point <entry-point [default: src/main.rs]>]
 ```
 
-* `<crate>/Cargo.toml`をパースし、クレート名を取得します。
+* `<crate>/Cargo.toml` をパースし、クレート名を取得します。
 * `<entry-point>` ファイルを起点に対象クレートの要素（モジュール／その他）に対する `use` 宣言と `mod` 宣言を辿り、依存するファイルを列挙します。
 * これらのファイルを `<entry-point>` ファイルとまとめて出力します。このとき、
+  * `<entry-point>` ファイルの中身が先に出力されます。`<crate>` の中で定義されたマクロを `<entry-point>` で使うには適当に書きかえてください。
   * ファイル構造は `(公開性) mod (モジュール名) { ... }` という形で反映されます。
   * 該当ファイル中の `use crate::...` は `use crate::(クレート名)::...` で置き換えられます。
   * 該当ファイル中の `(公開性) mod (モジュール名);` は削除されます。
