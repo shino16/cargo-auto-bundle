@@ -9,15 +9,17 @@ mod traverse;
 
 #[derive(StructOpt)]
 #[structopt(bin_name("cargo"))]
-struct Opt {
-    #[structopt(long = "crate", default_value = ".")]
-    crate_path: PathBuf,
-    #[structopt(long, default_value = "src/main.rs")]
-    entry_point: PathBuf,
+enum Opt {
+    AutoBundle {
+        #[structopt(long = "crate", default_value = ".")]
+        crate_path: PathBuf,
+        #[structopt(long, default_value = "src/main.rs")]
+        entry_point: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
-    let Opt {
+    let Opt::AutoBundle {
         crate_path,
         entry_point,
     } = Opt::from_args();
