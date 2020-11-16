@@ -47,28 +47,6 @@ impl Traverse {
             i -= 1;
         }
         Ok(self.mods_location.get(&mod_path[..i]).unwrap())
-        // todo!("not working");
-        // let mut path = PathBuf::from(&self.crate_root);
-        // assert_eq!(mod_path[0], self.crate_name);
-        // for (i, p) in mod_path.iter().enumerate().skip(1) {
-        //     let mut found_dir = false;
-        //     for entry in std::fs::read_dir(&path)? {
-        //         let entry = entry?;
-        //         found_dir |= entry.file_name() == OsString::from(p) && entry.metadata()?.is_dir();
-        //         let found_file = entry.file_name() == OsString::from(p.to_string() + ".rs");
-        //         if found_file {
-        //             path.push(entry.file_name());
-        //             return Ok((path, mod_path[..i + 1].to_owned()));
-        //         }
-        //     }
-        //     assert!(found_dir, "{} was not found", p);
-        //     path.push(p);
-        // }
-        // if path == self.crate_root {
-        //     path.push("lib.rs");
-        //     assert!(path.exists());
-        // }
-        // Ok((path, mod_path.to_owned()))
     }
 
     fn is_external_crate(p: &str) -> bool {
@@ -119,13 +97,6 @@ impl Traverse {
         let mods: Vec<_> = visitor
             .mods
             .into_iter()
-            // .map(|p| {
-            //     let mut path = path.clone();
-            //     path.push(p);
-            //     path
-            // })
-            // .map(|p| self.find_mod_file(&p).map(|(_, p)| p))
-            // .filter_map(|p| p.ok())
             .map(|p| self.find_mod_file(&p).map(|(_, p)| p.to_owned()))
             .try_collect()?;
 
@@ -195,7 +166,6 @@ impl Traverse {
                 }
             }
             file_path.pop();
-            // let found_file = entry.file_name() == OsString::from(p.to_string() + ".rs");
         }
         Ok(())
     }

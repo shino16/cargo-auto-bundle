@@ -15,7 +15,7 @@ pub fn compile(
 ) -> Result<String> {
     let mut res = String::new();
     let mut location = ModPath::new();
-    for (path, file_path) in paths.into_iter().zip(file_paths.into_iter()) {
+    for (path, file_path) in paths.into_iter().zip(file_paths) {
         let base = location
             .iter()
             .zip(path.iter())

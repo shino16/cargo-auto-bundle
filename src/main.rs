@@ -15,6 +15,8 @@ enum Opt {
         crate_path: PathBuf,
         #[structopt(long, default_value = "src/main.rs")]
         entry_point: PathBuf,
+        #[structopt(long)]
+        list_deps: bool,
     },
 }
 
@@ -22,6 +24,7 @@ fn main() -> Result<()> {
     let Opt::AutoBundle {
         crate_path,
         entry_point,
+        list_deps,
     } = Opt::from_args();
 
     let crate_path = crate_path.canonicalize()?;
@@ -40,8 +43,15 @@ fn main() -> Result<()> {
     let (paths, file_paths, mods_visibility) =
         traverse::Traverse::new(&crate_root, &crate_name, &entry_point)?.run()?;
 
+    if list_deps {
+        for file_path in file_paths {
+            println!("{}", file_path.to_string_lossy());
+        }
+        return Ok(());
+    }
+
     let mut result = compile::compile_entry(&entry_point, &crate_name)?;
-    result += &"\n".repeat(3);
+    result += "\n\n\n";
     result += &compile::compile(&crate_name, &paths, &file_paths, mods_visibility)?;
 
     println!("{}", result);
