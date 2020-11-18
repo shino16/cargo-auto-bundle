@@ -26,7 +26,7 @@ impl Traverse {
             crate_name: crate_name.to_owned(),
             todo: use_paths
                 .into_iter()
-                .filter(|path| Self::check_internal(crate_name, path))
+                .filter(|path| path[0] == crate_name)
                 .collect(),
             mods_location: BTreeMap::new(),
             mods_visibility: BTreeMap::new(),
@@ -47,21 +47,6 @@ impl Traverse {
             i -= 1;
         }
         Ok(self.mods_location.get(&mod_path[..i]).unwrap())
-    }
-
-    fn is_external_crate(p: &str) -> bool {
-        p == "std" // TODO
-    }
-
-    fn check_internal(crate_name: &str, path: &ModPath) -> bool {
-        if path[0] == crate_name {
-            true
-        } else {
-            if !Self::is_external_crate(&path[0]) {
-                eprintln!("Warning: Skipping {}", path[0]);
-            }
-            false
-        }
     }
 
     fn visit_mod(&mut self, path: &ModPath) -> Result<Vec<ModPath>> {
@@ -109,7 +94,7 @@ impl Traverse {
         let canonical: Result<Vec<_>, _> = paths
             .into_iter()
             .map(|p| self.canonicalize(p))
-            .filter(|p| Self::check_internal(&self.crate_name, p))
+            .filter(|path| path[0] == self.crate_name)
             .map(|p| self.find_mod_file(&p).map(|(_, p)| p.to_owned()))
             .collect();
 
@@ -235,7 +220,7 @@ fn visit_use_file(path: &Path) -> Result<Vec<ModPath>> {
     #[derive(Default)]
     struct Visitor {
         paths: Vec<ModPath>,
-    };
+    }
     impl<'ast> Visit<'ast> for Visitor {
         fn visit_use_tree(&mut self, item: &'ast syn::UseTree) {
             dfs(item, &mut Vec::new(), &mut self.paths);

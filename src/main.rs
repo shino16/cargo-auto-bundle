@@ -15,7 +15,7 @@ enum Opt {
         crate_path: PathBuf,
         #[structopt(long, default_value = "src/main.rs")]
         entry_point: PathBuf,
-        #[structopt(long)]
+        #[structopt(short, long)]
         list_deps: bool,
     },
 }
@@ -36,7 +36,6 @@ fn main() -> Result<()> {
     } else {
         panic!("No lib package found.");
     };
-    eprintln!("Searching `{}` crate", crate_name);
 
     let crate_root = crate_path.join("src").canonicalize()?;
 
