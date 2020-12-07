@@ -33,19 +33,13 @@ pub fn compile(
                 .filter(|s| s.is_empty())
                 .is_some()
             {
-                let s = format!("\nmod {} {{  ", name);
-                res += &s;
-                res += &"/".repeat(80 - s.len());
-                res += "\n";
+                res += &format!("\nmod {} {{\n", name);
             } else {
                 let vis = mod_visibility
                     .get(&location)
                     .cloned()
                     .unwrap_or("pub".to_owned());
-                let s = format!("\n{} mod {} {{  ", vis, name);
-                res += &s;
-                res += &"/".repeat(80 - s.len());
-                res += "\n";
+                res += &format!("\n{} mod {} {{\n", vis, name);
             }
         }
         res += "\n";
