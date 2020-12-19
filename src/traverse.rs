@@ -49,45 +49,6 @@ impl Traverse {
         Ok(self.mods_location.get(&mod_path[..i]).unwrap())
     }
 
-    fn visit_mod(&mut self, path: &ModPath) -> Result<Vec<ModPath>> {
-        #[derive(Default)]
-        struct Visitor {
-            path: ModPath,
-            mods: Vec<ModPath>,
-            vis: Vec<String>,
-        }
-        impl<'ast> Visit<'ast> for Visitor {
-            fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
-                use quote::ToTokens as _;
-                self.path.push(item.ident.to_string());
-
-                self.mods.push(self.path.clone());
-                self.vis.push(item.vis.to_token_stream().to_string());
-
-                syn::visit::visit_item_mod(self, item);
-
-                self.path.pop();
-            }
-        }
-
-        let content = std::fs::read_to_string(self.find_mod_file(path)?.0.to_owned())?;
-        let file = syn::parse_file(&content)?;
-        let mut visitor = Visitor::default();
-        visitor.path = path.to_owned();
-        visitor.visit_file(&file);
-
-        self.mods_visibility
-            .extend(visitor.mods.iter().cloned().zip(visitor.vis));
-
-        let mods: Vec<_> = visitor
-            .mods
-            .into_iter()
-            .map(|p| self.find_mod_file(&p).map(|(_, p)| p.to_owned()))
-            .try_collect()?;
-
-        Ok(mods)
-    }
-
     fn visit_use(&self, path: &ModPath) -> Result<Vec<ModPath>> {
         let paths = visit_use_file(&self.find_mod_file(&path)?.0)?;
 
@@ -170,9 +131,8 @@ impl Traverse {
         let mut pushed = self.todo.clone();
         while let Some(path) = self.todo.pop() {
             result.push(path.clone());
-            let mods = self.visit_mod(&path)?;
             let uses = self.visit_use(&path)?;
-            for path in mods.into_iter().chain(uses.into_iter()) {
+            for path in uses {
                 if !pushed.contains(&path) {
                     self.todo.push(path.clone());
                     pushed.push(path);
