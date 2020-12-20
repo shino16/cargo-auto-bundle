@@ -13,6 +13,7 @@ pub struct Traverse {
     crate_root: PathBuf,
     crate_name: String,
     todo: Vec<ModPath>,
+    exclude: PathBuf,
     mods_location: BTreeMap<ModPath, (PathBuf, ModPath)>,
     mods_visibility: BTreeMap<ModPath, String>,
 }
@@ -28,6 +29,7 @@ impl Traverse {
                 .into_iter()
                 .filter(|path| path[0] == crate_name)
                 .collect(),
+            exclude: crate_root.join("bin"),
             mods_location: BTreeMap::new(),
             mods_visibility: BTreeMap::new(),
         })
@@ -80,6 +82,9 @@ impl Traverse {
 
         for entry in std::fs::read_dir(&file_path)? {
             let entry = entry?;
+            if entry.path() == self.exclude {
+                continue;
+            }
             let name = entry.file_name();
             file_path.push(name.clone());
             let name_string = name
