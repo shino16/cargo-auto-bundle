@@ -11,9 +11,9 @@ mod traverse;
 #[structopt(bin_name("cargo"))]
 enum Opt {
     AutoBundle {
-        #[structopt(long = "crate", default_value = ".")]
+        #[structopt(short, long = "crate", default_value = ".")]
         crate_path: PathBuf,
-        #[structopt(long, default_value = "src/main.rs")]
+        #[structopt(short, long, default_value = "src/main.rs")]
         entry_point: PathBuf,
         #[structopt(short, long)]
         list_deps: bool,

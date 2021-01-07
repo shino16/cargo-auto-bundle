@@ -1,6 +1,6 @@
 [package]
 name = "cargo-auto-bundle"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["shino16 <masatosinokawa@gmail.com>"]
 edition = "2018"
 
