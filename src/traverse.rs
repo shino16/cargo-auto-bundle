@@ -43,22 +43,36 @@ impl Traverse {
         path
     }
 
-    fn find_mod_file(&self, mod_path: &ModPath) -> Result<&(PathBuf, ModPath)> {
+    fn find_mod_file(&self, mod_path: &ModPath, at: &ModPath) -> Result<&(PathBuf, ModPath)> {
         let mut i = mod_path.len();
-        while !self.mods_location.contains_key(&mod_path[..i]) {
+        while i != 0 && !self.mods_location.contains_key(&mod_path[..i]) {
             i -= 1;
         }
-        Ok(self.mods_location.get(&mod_path[..i]).unwrap())
+        let path = if i != 0 {
+            mod_path[..i].to_owned()
+        } else {
+            let mut path = at.to_owned();
+            for p in mod_path {
+                if p == "self" {
+                } else if p == "super" {
+                    path.pop().unwrap();
+                } else {
+                    path.push(p.clone());
+                }
+            }
+            path
+        };
+        Ok(self.mods_location.get(&path).unwrap())
     }
 
     fn visit_use(&self, path: &ModPath) -> Result<Vec<ModPath>> {
-        let paths = visit_use_file(&self.find_mod_file(&path)?.0)?;
+        let paths = visit_use_file(&self.find_mod_file(&path, &path)?.0)?;
 
         let canonical: Result<Vec<_>, _> = paths
             .into_iter()
             .map(|p| self.canonicalize(p))
-            .filter(|path| path[0] == self.crate_name)
-            .map(|p| self.find_mod_file(&p).map(|(_, p)| p.to_owned()))
+            .filter(|p| [&self.crate_name, "self", "super"].contains(&(&p[0] as &str)))
+            .map(|p| self.find_mod_file(&p, &path).map(|(_, p)| p.to_owned()))
             .collect();
 
         Ok(canonical?.into_iter().unique().collect())
@@ -131,7 +145,7 @@ impl Traverse {
         self.todo = self
             .todo
             .iter()
-            .map(|path| self.find_mod_file(path).map(|(_, p)| p.to_owned()))
+            .map(|path| self.find_mod_file(path, path).map(|(_, p)| p.to_owned()))
             .try_collect()?;
         let mut pushed = self.todo.clone();
         while let Some(path) = self.todo.pop() {
@@ -148,7 +162,7 @@ impl Traverse {
         result.dedup();
         let paths = result
             .iter()
-            .map(|path| self.find_mod_file(path).map(|(p, _)| p.to_owned()))
+            .map(|path| self.find_mod_file(path, path).map(|(p, _)| p.to_owned()))
             .try_collect()?;
         Ok((result, paths, std::mem::take(&mut self.mods_visibility)))
     }
