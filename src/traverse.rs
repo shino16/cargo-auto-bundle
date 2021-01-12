@@ -12,6 +12,7 @@ use super::ModPath;
 pub struct Traverse {
     crate_root: PathBuf,
     crate_name: String,
+    entry_path: ModPath,
     todo: Vec<ModPath>,
     exclude: PathBuf,
     mods_location: BTreeMap<ModPath, (PathBuf, ModPath)>,
@@ -20,14 +21,26 @@ pub struct Traverse {
 
 impl Traverse {
     pub fn new(crate_root: &Path, crate_name: &str, entry_point: &Path) -> Result<Self> {
-        let use_paths = visit_use_file(&entry_point.canonicalize()?)?;
+        let entry_point = entry_point.canonicalize()?;
+        let use_paths = visit_use_file(&entry_point)?;
+        let mut entry_path: Vec<String> = entry_point
+            .parent()
+            .unwrap()
+            .join(entry_point.file_stem().unwrap())
+            .strip_prefix(crate_root)
+            .unwrap_or(&Path::new(""))
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+        entry_path.insert(0, crate_name.to_owned());
 
         Ok(Traverse {
             crate_root: crate_root.to_owned(),
             crate_name: crate_name.to_owned(),
+            entry_path,
             todo: use_paths
                 .into_iter()
-                .filter(|path| path[0] == crate_name)
+                .filter(|p| [crate_name, "crate", "self", "super"].contains(&(&p[0] as &str)))
                 .collect(),
             exclude: crate_root.join("bin"),
             mods_location: BTreeMap::new(),
@@ -35,12 +48,27 @@ impl Traverse {
         })
     }
 
-    fn canonicalize(&self, mut path: ModPath) -> ModPath {
-        // TODO: convert relative path to absolute path
-        if path[0] == "crate" {
-            path[0] = self.crate_name.clone();
+    fn canonicalize(&self, path: &ModPath, at: &ModPath) -> ModPath {
+        let mut res = if path[0] == "self" || path[0] == "super" {
+            at.to_owned()
+        } else {
+            ModPath::new()
+        };
+        for p in path {
+            match p as &str {
+                "crate" => {
+                    res.push(self.crate_name.to_owned());
+                }
+                "self" => {}
+                "super" => {
+                    res.pop().unwrap();
+                }
+                p => {
+                    res.push(p.to_owned());
+                }
+            }
         }
-        path
+        res
     }
 
     fn find_mod_file(&self, mod_path: &ModPath, at: &ModPath) -> Result<&(PathBuf, ModPath)> {
@@ -48,21 +76,11 @@ impl Traverse {
         while i != 0 && !self.mods_location.contains_key(&mod_path[..i]) {
             i -= 1;
         }
-        let path = if i != 0 {
-            mod_path[..i].to_owned()
+        if i != 0 {
+            Ok(self.mods_location.get(&mod_path[..i]).unwrap())
         } else {
-            let mut path = at.to_owned();
-            for p in mod_path {
-                if p == "self" {
-                } else if p == "super" {
-                    path.pop().unwrap();
-                } else {
-                    path.push(p.clone());
-                }
-            }
-            path
-        };
-        Ok(self.mods_location.get(&path).unwrap())
+            self.find_mod_file(&self.canonicalize(mod_path, at), at)
+        }
     }
 
     fn visit_use(&self, path: &ModPath) -> Result<Vec<ModPath>> {
@@ -70,8 +88,8 @@ impl Traverse {
 
         let canonical: Result<Vec<_>, _> = paths
             .into_iter()
-            .map(|p| self.canonicalize(p))
-            .filter(|p| [&self.crate_name, "self", "super"].contains(&(&p[0] as &str)))
+            .map(|p| self.canonicalize(&p, path))
+            .filter(|p| [&self.crate_name, "crate", "self", "super"].contains(&(&p[0] as &str)))
             .map(|p| self.find_mod_file(&p, &path).map(|(_, p)| p.to_owned()))
             .collect();
 
@@ -145,7 +163,10 @@ impl Traverse {
         self.todo = self
             .todo
             .iter()
-            .map(|path| self.find_mod_file(path, path).map(|(_, p)| p.to_owned()))
+            .map(|path| {
+                self.find_mod_file(path, &self.entry_path)
+                    .map(|(_, p)| p.to_owned())
+            })
             .try_collect()?;
         let mut pushed = self.todo.clone();
         while let Some(path) = self.todo.pop() {
