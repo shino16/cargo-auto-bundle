@@ -92,6 +92,7 @@ impl Traverse {
             .into_iter()
             .map(|p| self.canonicalize(&p, path))
             .filter(|p| [&self.crate_name, "crate", "self", "super"].contains(&(&p[0] as &str)))
+            .filter(|p| p.len() != 2 || !self.exported_macros.contains(&p[1]))
             .map(|p| self.find_mod_file(&p, &path).map(|(_, p)| p.to_owned()))
             .collect();
 
