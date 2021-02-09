@@ -56,7 +56,11 @@ fn main() -> Result<()> {
         result += &compiled;
     }
 
-    print!("{}", result);
+    let mut s = 0;
+    while result.as_bytes().get(s) == Some(&b'\n') {
+        s += 1;
+    }
+    print!("{}", &result[s..]);
 
     Ok(())
 }

@@ -247,8 +247,8 @@ fn visit_use_file(path: &Path) -> Result<Vec<ModPath>> {
         paths: Vec<ModPath>,
     }
     impl<'ast> Visit<'ast> for Visitor {
-        fn visit_use_tree(&mut self, item: &'ast syn::UseTree) {
-            dfs(item, &mut Vec::new(), &mut self.paths);
+        fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
+            dfs(&item.tree, &mut Vec::new(), &mut self.paths);
         }
     }
 
