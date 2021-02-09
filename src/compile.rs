@@ -2,6 +2,7 @@ use super::ModPath;
 use anyhow::Result;
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
+use quote::ToTokens;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -84,35 +85,35 @@ fn read_process<'a>(
     use syn::visit::Visit;
     struct Visitor<'ast, 'a, 'b> {
         use_spans: Vec<(&'ast Ident, Span)>,
-        mod_spans: Vec<(Span, Span)>,
+        remove_spans: Vec<(Span, Span)>,
         crate_name: &'a str,
         macros: &'b [String],
     }
     impl<'ast, 'a, 'b> Visit<'ast> for Visitor<'ast, 'a, 'b> {
-        fn visit_use_tree(&mut self, item: &'ast syn::UseTree) {
-            let ident = match item {
-                syn::UseTree::Path(path) => {
-                    if let syn::UseTree::Name(ref name) = *path.tree {
-                        if path.ident == self.crate_name
-                            && self.macros.contains(&name.ident.to_string())
-                        {
-                            return;
+        fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
+            if let syn::UseTree::Path(ref path) = item.tree {
+                if let syn::UseTree::Name(ref name) = *path.tree {
+                    if path.ident == self.crate_name
+                        && self.macros.contains(&name.ident.to_string())
+                    {
+                        if path.ident != "crate" {
+                            let mut iter = item.to_token_stream().into_iter();
+                            let start = iter.next().unwrap().span();
+                            let end = iter.last().unwrap().span();
+                            self.remove_spans.push((start, end));
                         }
+                        return;
                     }
-                    &path.ident
                 }
-                syn::UseTree::Name(name) => &name.ident,
-                _ => return,
+                self.use_spans.push((&path.ident, path.ident.span()));
             };
-            self.use_spans.push((&ident, ident.span()));
         }
         fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
-            use quote::ToTokens;
             if item.semi.is_some() {
                 let mut iter = item.to_token_stream().into_iter();
                 let start = iter.next().unwrap().span();
                 let end = iter.last().unwrap().span();
-                self.mod_spans.push((start, end));
+                self.remove_spans.push((start, end));
             }
             syn::visit::visit_item_mod(self, item);
         }
@@ -122,7 +123,7 @@ fn read_process<'a>(
     let file = syn::parse_file(&content)?;
     let mut visitor = Visitor {
         use_spans: Vec::new(),
-        mod_spans: Vec::new(),
+        remove_spans: Vec::new(),
         crate_name: if external { crate_name } else { "crate" },
         macros,
     };
@@ -137,11 +138,11 @@ fn read_process<'a>(
             targets.push((span.start(), span.start(), "crate::".to_owned()));
         }
     }
-    for (start, end) in visitor.mod_spans {
+    for (start, end) in visitor.remove_spans {
         targets.push((start.start(), end.end(), "".to_owned()));
     }
 
-    targets.sort();
+    targets.sort_unstable();
 
     let lines = content.lines().collect_vec();
     if lines.is_empty() {
