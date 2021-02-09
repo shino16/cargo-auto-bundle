@@ -1,6 +1,6 @@
 [package]
 name = "cargo-auto-bundle"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["shino16 <masatosinokawa@gmail.com>"]
 edition = "2018"
 
@@ -11,6 +11,6 @@ anyhow = "1.0"
 itertools = "0.9"
 structopt = "0.3"
 cargo_toml = "0.8"
-syn = { version = "1.0", features = ["full", "visit", "extra-traits"] }
+syn = { version = "1.0", features = ["full", "visit", "printing", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
