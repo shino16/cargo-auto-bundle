@@ -39,7 +39,7 @@ fn main() -> Result<()> {
 
     let crate_root = crate_path.join("src").canonicalize()?;
 
-    let (paths, file_paths, mods_visibility) =
+    let (paths, file_paths, mods_visibility, macros) =
         traverse::Traverse::new(&crate_root, &crate_name, &entry_point)?.run()?;
 
     if list_deps {
@@ -49,11 +49,14 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let mut result = compile::compile_entry(&entry_point, &crate_name)?;
-    result += "\n\n\n";
-    result += &compile::compile(&crate_name, &paths, &file_paths, mods_visibility)?;
+    let mut result = compile::compile_entry(&entry_point, &crate_name, &macros)?;
+    let compiled = compile::compile(&crate_name, &paths, &file_paths, mods_visibility, &macros)?;
+    if !compiled.is_empty() {
+        result += "\n\n";
+        result += &compiled;
+    }
 
-    println!("{}", result);
+    print!("{}", result);
 
     Ok(())
 }

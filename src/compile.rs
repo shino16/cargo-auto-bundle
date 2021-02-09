@@ -12,6 +12,7 @@ pub fn compile(
     paths: &[ModPath],
     file_paths: &[PathBuf],
     mod_visibility: BTreeMap<ModPath, String>,
+    macros: &[String],
 ) -> Result<String> {
     let mut res = String::new();
     let mut location = ModPath::new();
@@ -43,36 +44,70 @@ pub fn compile(
             }
         }
         res += "\n";
-        res += &read_proc(&file_path, crate_name, false)?;
+        res += &read_process(&file_path, crate_name, false, macros)?;
     }
     while let Some(p) = location.pop() {
         res += &format!("\n}}  // mod {}\n", p);
     }
-    Ok(res)
+    Ok(reduce_newline(res))
 }
 
-pub fn compile_entry(path: &Path, crate_name: &str) -> Result<String> {
-    Ok(read_proc(path, crate_name, true)?)
+fn reduce_newline(mut s: String) -> String {
+    let bytes = unsafe { s.as_bytes_mut() };
+    let mut j = 0;
+    let mut newline_cnt = 0;
+    for i in 0..bytes.len() {
+        if bytes[i] == b'\n' {
+            newline_cnt += 1;
+        } else {
+            newline_cnt = 0;
+        }
+        if newline_cnt <= 2 {
+            bytes[j] = bytes[i];
+            j += 1;
+        }
+    }
+    s.truncate(j);
+    s
 }
 
-fn read_proc(file_path: &Path, crate_name: &str, external: bool) -> Result<String> {
+pub fn compile_entry(path: &Path, crate_name: &str, macros: &[String]) -> Result<String> {
+    Ok(read_process(path, crate_name, true, macros)?)
+}
+
+fn read_process<'a>(
+    file_path: &Path,
+    crate_name: &'a str,
+    external: bool,
+    macros: &[String],
+) -> Result<String> {
     use syn::visit::Visit;
-    #[derive(Default)]
-    struct Visitor<'ast> {
+    struct Visitor<'ast, 'a, 'b> {
         use_spans: Vec<(&'ast Ident, Span)>,
         mod_spans: Vec<(Span, Span)>,
+        crate_name: &'a str,
+        macros: &'b [String],
     }
-    impl<'ast> Visit<'ast> for Visitor<'ast> {
+    impl<'ast, 'a, 'b> Visit<'ast> for Visitor<'ast, 'a, 'b> {
         fn visit_use_tree(&mut self, item: &'ast syn::UseTree) {
             let ident = match item {
-                syn::UseTree::Path(path) => &path.ident,
+                syn::UseTree::Path(path) => {
+                    if let syn::UseTree::Name(ref name) = *path.tree {
+                        if path.ident == self.crate_name
+                            && self.macros.contains(&name.ident.to_string())
+                        {
+                            return;
+                        }
+                    }
+                    &path.ident
+                }
                 syn::UseTree::Name(name) => &name.ident,
                 _ => return,
             };
             self.use_spans.push((&ident, ident.span()));
         }
         fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
-            use quote::ToTokens as _;
+            use quote::ToTokens;
             if item.semi.is_some() {
                 let mut iter = item.to_token_stream().into_iter();
                 let start = iter.next().unwrap().span();
@@ -85,7 +120,12 @@ fn read_proc(file_path: &Path, crate_name: &str, external: bool) -> Result<Strin
 
     let content = std::fs::read_to_string(file_path)?;
     let file = syn::parse_file(&content)?;
-    let mut visitor = Visitor::default();
+    let mut visitor = Visitor {
+        use_spans: Vec::new(),
+        mod_spans: Vec::new(),
+        crate_name: if external { crate_name } else { "crate" },
+        macros,
+    };
     visitor.visit_file(&file);
 
     let mut targets = Vec::new();

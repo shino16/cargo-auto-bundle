@@ -1,5 +1,5 @@
 use anyhow::{Error, Result};
-use itertools::Itertools as _;
+use itertools::Itertools;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -17,6 +17,7 @@ pub struct Traverse {
     exclude: PathBuf,
     mods_location: BTreeMap<ModPath, (PathBuf, ModPath)>,
     mods_visibility: BTreeMap<ModPath, String>,
+    exported_macros: Vec<String>,
 }
 
 impl Traverse {
@@ -45,6 +46,7 @@ impl Traverse {
             exclude: crate_root.join("bin"),
             mods_location: BTreeMap::new(),
             mods_visibility: BTreeMap::new(),
+            exported_macros: Vec::new(),
         })
     }
 
@@ -96,12 +98,21 @@ impl Traverse {
         Ok(canonical?.into_iter().unique().collect())
     }
 
-    fn search_mods(&mut self, file_path: &mut PathBuf, path: &mut ModPath) -> Result<()> {
+    fn scan_mods(&mut self, file_path: &mut PathBuf, path: &mut ModPath) -> Result<()> {
         struct Visitor {
             mods: Vec<ModPath>,
+            macros: Vec<String>,
             path: ModPath,
         }
         impl<'ast> Visit<'ast> for Visitor {
+            fn visit_item_macro(&mut self, item: &'ast syn::ItemMacro) {
+                if item.attrs.contains(&syn::parse_quote!(#[macro_export])) {
+                    if let Some(ref ident) = item.ident {
+                        self.macros.push(ident.to_string());
+                    }
+                }
+                syn::visit::visit_item_macro(self, item);
+            }
             fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
                 self.path.push(item.ident.to_string());
                 if item.content.is_some() {
@@ -124,7 +135,7 @@ impl Traverse {
                 .map_err(|_| Error::msg(format!("Cannot open {:?}", file_path)))?;
             if entry.metadata()?.is_dir() {
                 path.push(name_string);
-                self.search_mods(file_path, path)?;
+                self.scan_mods(file_path, path)?;
                 path.pop();
             } else {
                 let name_str = &name_string[..name_string.len() - 3];
@@ -137,6 +148,7 @@ impl Traverse {
                 let file = syn::parse_file(&content)?;
                 let mut visitor = Visitor {
                     mods: Vec::new(),
+                    macros: Vec::new(),
                     path: path.to_owned(),
                 };
                 visitor.visit_file(&file);
@@ -144,6 +156,7 @@ impl Traverse {
                     self.mods_location
                         .insert(mod_path, (file_path.clone(), path.clone())); // TODO
                 }
+                self.exported_macros.extend_from_slice(&visitor.macros);
                 if name_str != "mod" && name_str != "lib" {
                     path.pop();
                 }
@@ -153,8 +166,15 @@ impl Traverse {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<(Vec<ModPath>, Vec<PathBuf>, BTreeMap<ModPath, String>)> {
-        self.search_mods(
+    pub fn run(
+        &mut self,
+    ) -> Result<(
+        Vec<ModPath>,
+        Vec<PathBuf>,
+        BTreeMap<ModPath, String>,
+        Vec<String>,
+    )> {
+        self.scan_mods(
             &mut self.crate_root.clone(),
             &mut vec![self.crate_name.clone()],
         )?;
@@ -185,7 +205,12 @@ impl Traverse {
             .iter()
             .map(|path| self.find_mod_file(path, path).map(|(p, _)| p.to_owned()))
             .try_collect()?;
-        Ok((result, paths, std::mem::take(&mut self.mods_visibility)))
+        Ok((
+            result,
+            paths,
+            std::mem::take(&mut self.mods_visibility),
+            std::mem::take(&mut self.exported_macros),
+        ))
     }
 }
 
