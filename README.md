@@ -20,10 +20,11 @@ $ cargo auto-bundle [--crate <crate [default: .]>] [--entry-point <entry-point [
 
 ```rust
 use lib::ds::fenwick::*;
+use proconio::*;
 
-#[proconio::fastout]
+#[fastout]
 fn main() {
-    proconio::input! {
+    input! {
         n: usize, q: usize,
         a: [u32; n],
         txy: [(u32, usize, usize); q],
@@ -36,6 +37,7 @@ fn main() {
         }
     }
 }
+
 ```
 
 このコードを `lib` クレート中の `src/main.rs` に置き、次を実行します：
@@ -44,7 +46,7 @@ fn main() {
 $ cargo auto-bundle > tmp.rs
 ```
 
-これを提出⇒[AC](https://atcoder.jp/contests/abc185/submissions/20067450)
+これを提出⇒[AC](https://atcoder.jp/contests/abc185/submissions/20195269)
 
 このコードが依存する `lib::ds::fenwick` モジュールと、`lib::ds::fenwick` が依存する `lib::alg`、`lib::bits` の中身がモジュール構造を保って展開されています。
 
