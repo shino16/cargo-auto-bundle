@@ -41,7 +41,14 @@ impl Traverse {
             entry_path,
             todo: use_paths
                 .into_iter()
-                .filter(|p| [crate_name, "crate", "self", "super"].contains(&(&p[0] as &str)))
+                .filter(|p| if [crate_name, "crate", "self", "super"].contains(&(&*p[0])) {
+                    true
+                } else {
+                    if p[0] != "std" && p[0] != "core" {
+                        eprintln!("[warning] skipping `{}`", p[0]);
+                    }
+                    false
+                })
                 .collect(),
             exclude: crate_root.join("bin"),
             mods_location: BTreeMap::new(),
@@ -91,7 +98,14 @@ impl Traverse {
         let canonical: Result<Vec<_>, _> = paths
             .into_iter()
             .map(|p| self.canonicalize(&p, path))
-            .filter(|p| [&self.crate_name, "crate", "self", "super"].contains(&(&p[0] as &str)))
+            .filter(|p| if [&self.crate_name, "crate", "self", "super"].contains(&(&*p[0])) {
+                true
+            } else {
+                if p[0] != "std" && p[0] != "core" {
+                    eprintln!("[warning] skipping `{}`", p[0]);
+                }
+                false
+            })
             .filter(|p| p.len() != 2 || !self.exported_macros.contains(&p[1]))
             .map(|p| self.find_mod_file(&p, &path).map(|(_, p)| p.to_owned()))
             .collect();
