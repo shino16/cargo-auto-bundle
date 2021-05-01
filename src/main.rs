@@ -52,7 +52,7 @@ fn main() -> Result<()> {
     let mut result = compile::compile_entry(&entry_point, &crate_name, &macros)?;
     let compiled = compile::compile(&crate_name, &paths, &file_paths, mods_visibility, &macros)?;
     if !compiled.is_empty() {
-        result += "\n\n";
+        result += "\n";
         result += &compiled;
     }
 
